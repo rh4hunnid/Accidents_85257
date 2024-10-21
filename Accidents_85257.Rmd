@@ -1,0 +1,185 @@
+---
+title: "Analysis of Traffic Accidents in Zipcode 85257"
+subtitle: "A Statistical Approach Using Regression and Estimation Techniques"
+date: October 17, 2024
+output: ioslides_presentation
+---
+
+<style type="text/css">
+body p, div, h1, h2, h3, h4, h5 {
+color: black !important;
+font-family: Modern Computer Roman;
+}
+slides > slide.title-slide hgroup h1 {
+color: black !important;
+}
+h2 {
+color: black !important; 
+}
+</style>
+
+```{r setup, include=FALSE}
+
+
+library(ggplot2)
+library(dplyr)
+library(plotly)
+library(tidyr)
+data <- read.csv("US_Accidents_85257.csv")
+
+total_accidents_85257 <- data %>% filter(Zipcode == "85257") %>% nrow()
+filtered_data <- data %>% filter(Zipcode == "85257")
+filtered_data$Start_Time <- as.POSIXct(filtered_data$Start_Time, format="%Y-%m-%d %H:%M:%S")
+filtered_data_clean <- filtered_data %>% drop_na(Start_Time, Temperature.F., Severity)
+accidents_per_day <- filtered_data_clean %>%
+  mutate(Date = as.Date(Start_Time)) %>%
+  group_by(Date) %>%
+  summarize(Daily_Accidents = n())
+
+lambda <- mean(accidents_per_day$Daily_Accidents)
+```
+
+
+
+
+## Introduction
+- Over the time period from (February 2016 - March 2023) there has been a total of **`r total_accidents_85257`** Accidents in the 85257 Zipcode Recorded
+- Using "A Countrywide Traffic Accident Dataset" from Sobhan Moosavi we will be analyzing patterns and relationships of accidents occurring in 85257
+- Data set found here https://www.kaggle.com/datasets/sobhanmoosavi/us-accidents/data
+
+## Exploration of The Data
+
+- Average accident severity: **`r mean(filtered_data$Severity, na.rm = TRUE)`**
+- Range of accident dates: **`r min(filtered_data$Start_Time)`** to **`r max(filtered_data$Start_Time)`**
+
+```{r,echo=FALSE,fig.width=6, warning=FALSE}
+plot_ly(filtered_data_clean, 
+        x = ~Start_Time, 
+        y = ~Temperature.F., 
+        z = ~Severity, 
+        type = "scatter3d", 
+        mode = "markers", 
+        marker = list(size = 3, color = ~Severity, colorscale = 'sunsetdark', showscale = TRUE),
+  
+        width = 600,
+        height = 400
+) %>%
+  layout(
+    title = "3D Scatter Plot of Accident Severity, Temperature, and Time of Accident in Zipcode 85257",
+    scene = list(
+      xaxis = list(title = 'Time of Accident',
+                    range = c("2016-02-01", "2023-03-31")
+      ),
+      yaxis = list(title = 'Temperature (F)'),
+      zaxis = list(title = 'Severity')
+    )
+  )
+
+```
+
+
+## The code to create the previous slide
+
+
+
+<font size="1">
+```{r, eval=FALSE}
+
+plot_ly(filtered_data_clean, 
+        x = ~Start_Time, 
+        y = ~Temperature.F., 
+        z = ~Severity, 
+        type = "scatter3d", 
+        mode = "markers", 
+        marker = list(size = 3, color = ~Severity, colorscale = 'sunsetdark', showscale = TRUE),
+  
+        width = 600,
+        height = 400
+)
+
+```
+</font>
+
+## The code to create the previous slide part 2: Layout
+```{r,eval=FALSE}
+layout(
+    title = "3D Scatter Plot of Accident Severity, Temperature, and Time of Accident in Zipcode 85257",
+    scene = list(
+      xaxis = list(title = 'Time of Accident',
+                    range = c("2016-02-01", "2023-03-31")
+      ),
+      yaxis = list(title = 'Temperature (F)'),
+      zaxis = list(title = 'Severity')
+    )
+  )
+```
+## Linear Regression
+
+- **Linear Regression between Temperature and Accident Severity**
+```{r,echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(filtered_data_clean, aes(x = Temperature.F., y = Severity)) +
+  geom_jitter(width = 0.3, height = 0.1) +
+  geom_smooth(method = 'lm')
+```
+
+
+## Number of Accidents during Day vs Night
+
+```{r, cars, echo=FALSE}
+day_night_data <- filtered_data_clean %>%
+  group_by(Sunrise_Sunset) %>%
+  summarize(Accident_Count = n())
+
+
+ggplot(day_night_data, aes(x = Sunrise_Sunset, y = Accident_Count, fill = Sunrise_Sunset)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = Accident_Count), vjust = -0.5, size = 5) +
+  labs(title = "Bar Plot of the Number of Accidents: Day vs. Night",
+       x = "Time of Day",
+       y = "Accident Count") +
+  theme_dark() +
+  scale_fill_manual(values = c("Day" = "blue", "Night" = "purple")) +
+  theme(legend.position = "none")
+```
+
+## Important Severity Statisitcs
+
+- **Mean Severity**: $\bar{x} = \frac{1}{n} \sum_{i=1}^{n} x_i$ = **`r mean(filtered_data_clean$Severity, na.rm = TRUE)`**
+- **Variance**: $\sigma^2 = \frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^2$ = **`r var(filtered_data_clean$Severity, na.rm=TRUE)`**
+- **Standard Deviation**: $\sigma = \sqrt{\frac{1}{n} \sum_{i=1}^{n} (x_i - \bar{x})^2}$ = **`r sd(filtered_data_clean$Severity, na.rm=TRUE)`**
+
+## Poisson Distribution for Daily Accident Frequency
+
+The probability of observing $k$ accidents in a fixed interval is given by the Poisson formula:
+
+$$
+P(X = k) = \frac{\lambda^k e^{-\lambda}}{k!}
+$$
+
+where:
+- $\lambda$ is the average rate of accidents per day
+- $k$ is the number of accidents observed
+
+
+## Poisson Distribution for Daily Accident Frequency
+- **Average accidents per day ($\lambda$): `r round(lambda, 2)`**
+
+```{r,echo=FALSE,warning=FALSE}
+
+
+poisson_data <- data.frame(
+  x = 0:max(accidents_per_day$Daily_Accidents),
+  Probability = dpois(0:max(accidents_per_day$Daily_Accidents), lambda)
+)
+
+ggplot(accidents_per_day, aes(x = Daily_Accidents)) +
+  geom_histogram(aes(y = ..density..), binwidth = 1, fill = "blue", alpha = 0.5) +
+  geom_line(data = poisson_data, aes(x = x, y = Probability), color = "red", linewidth = 1.3) +
+  labs(
+    title = "Graph of Actual vs. Poisson Distribution of Daily Accidents",
+    x = "Number of Accidents per Day",
+    y = "Density"
+  ) +
+  theme_dark()
+```
+
